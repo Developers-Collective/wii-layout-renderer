@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wii-layout-renderer"
+version = "0.1.0"
+description = "Read-only PyQt6 renderer for Wii NW4R layout archives."
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "PyQt6>=6.5",
+]
+
+[tool.setuptools]
+package-dir = { "wii_layout_renderer" = "src" }
+packages = [
+    "wii_layout_renderer",
+    "wii_layout_renderer.animation",
+    "wii_layout_renderer.formats",
+    "wii_layout_renderer.render",
+]
