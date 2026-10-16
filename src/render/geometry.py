@@ -7,11 +7,14 @@ the X and Y rows of its global 3x4 matrix; rotations about X and Y foreshorten p
 from __future__ import annotations
 
 import math
+from typing import Optional
 
-from ..state import PaneState
+from ..state import LayoutState, PaneState, PictureState, TextBoxState, WindowState
 
 # Row-major 3x4 affine matrix: (m00, m01, m02, m03, m10, ..., m23).
 Matrix = tuple[float, float, float, float, float, float, float, float, float, float, float, float]
+# A rectangle in layout units: left, bottom, right, top (Y up).
+Bounds = tuple[float, float, float, float]
 
 IDENTITY: Matrix = (1.0, 0.0, 0.0, 0.0,
                     0.0, 1.0, 0.0, 0.0,
@@ -57,3 +60,28 @@ def base_point(pane: PaneState) -> tuple[float, float]:
     x = (0.0, -width / 2, -width)[horizontal]
     y = (0.0, height / 2, height)[min(vertical, 2)]
     return x, y
+
+
+def drawn_bounds(state: LayoutState) -> Optional[Bounds]:
+    """The rectangle around every visible picture, window and text box, or None when nothing is drawn."""
+    corners = []
+
+    def visit(pane: PaneState, parent_matrix: Matrix) -> None:
+        if not pane.visible:
+            return
+        matrix = multiply(parent_matrix, pane_matrix(pane))
+        if isinstance(pane, (PictureState, WindowState, TextBoxState)):
+            xx, xy, yx, yy, dx, dy = plane_affine(matrix)
+            x, y = base_point(pane)
+            for cx in (x, x + pane.size.x):
+                for cy in (y, y - pane.size.y):
+                    corners.append((xx * cx + yx * cy + dx, xy * cx + yy * cy + dy))
+        for child in pane.children:
+            visit(child, matrix)
+
+    if state.root is not None:
+        visit(state.root, IDENTITY)
+    if not corners:
+        return None
+    xs, ys = zip(*corners)
+    return min(xs), min(ys), max(xs), max(ys)

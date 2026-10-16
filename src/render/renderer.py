@@ -58,7 +58,7 @@ class LayoutRenderer:
         canvas_width, canvas_height = canvas_size(state)
         painter.save()
         try:
-            painter.setClipRect(target)
+            painter.setClipRect(target, QtCore.Qt.ClipOperation.IntersectClip)
             if background is not None:
                 painter.fillRect(target, background)
             scale_x = target.width() / canvas_width
@@ -224,7 +224,7 @@ class _StatePainter:
         top, bottom = pane.top_color.as_tuple(), pane.bottom_color.as_tuple()
         combiner = _combiner(self.state.material(pane.material_index))
         key = ("text", run_key, top, bottom, combiner)
-        image = self.renderer.cached(key, lambda: _to_image(shade_text(run.coverage, top, bottom, combiner)))
+        image = self.renderer.cached(key, lambda: _to_image(shade_text(run.texels, top, bottom, combiner)))
         self.draw_image(image, world, x + run.left, y, run.image_width, run.image_height, alpha, True)
 
     def text_run(self, pane: TextBoxState, font: Optional[Brfnt]) -> tuple[tuple, Optional[TextRun]]:
@@ -275,7 +275,7 @@ def _to_image(argb: np.ndarray) -> QtGui.QImage:
 
 
 def _system_text_run(text: str, font_height: float, pixel_height: int, alignment: int) -> Optional[TextRun]:
-    """Glyph coverage drawn with the default system font, for text boxes whose BRFNT is not available."""
+    """Glyphs drawn white with the default system font, for text boxes whose BRFNT is not available."""
     font = QtGui.QFont()
     font.setPixelSize(pixel_height)
     metrics = QtGui.QFontMetricsF(font)
@@ -299,6 +299,7 @@ def _system_text_run(text: str, font_height: float, pixel_height: int, alignment
 
     pixels = np.frombuffer(image.constBits().asstring(image.sizeInBytes()), dtype=np.uint32)
     alpha = (pixels.reshape(height, image.bytesPerLine() // 4)[:, :width] >> 24).astype(np.uint8)
-    coverage = np.stack((np.full_like(alpha, 255), alpha), axis=-1)
+    white = np.full_like(alpha, 255)
+    texels = np.stack((white, white, white, alpha), axis=-1)
     scale = font_height * len(lines) / height
-    return TextRun(coverage, scale, scale, width * scale, height * scale)
+    return TextRun(texels, scale, scale, width * scale, height * scale)

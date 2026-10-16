@@ -12,6 +12,7 @@ from .formats import FormatError
 from .hooks import FrameContext, HookHandle, StateHook
 from .preview import LayoutPreview
 from .render import LayoutRenderer
+from .render.geometry import drawn_bounds
 from .resources import FontLibrary, LayoutArchive, Resources, Texture
 from .state import (BoundingState, Color, LayoutState, MaterialState, PaneState, PictureState, TexCoords,
                     TextBoxState, TextureMap, TextureSrt, Vec2, Vec3, WindowFrameState, WindowInflation,
@@ -23,4 +24,5 @@ __all__ = [
     "LayoutArchive", "LayoutPreview", "LayoutPreviewWidget", "LayoutRenderer", "LayoutState", "MaterialState",
     "PaneState", "PictureState", "Resources", "StateHook", "TexCoords", "TextBoxState", "Texture", "TextureMap",
     "TextureSrt", "TrackInfo", "Vec2", "Vec3", "WindowFrameState", "WindowInflation", "WindowState",
+    "drawn_bounds",
 ]

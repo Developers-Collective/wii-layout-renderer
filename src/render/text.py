@@ -3,7 +3,8 @@
 The font size scales glyphs by ``font_size.x / font.width`` across and ``font_size.y / font.height`` down.
 Characters advance by their char width plus the character space; each line is the font's line feed plus
 the line space high. A text box's text is drawn as one run: its glyphs in an image at the font's pixel
-size, which the renderer scales and places in the pane.
+size, which the renderer scales and places in the pane. The glyphs keep the colours their sheet's texture
+format gives them, as GX samples it.
 """
 from __future__ import annotations
 
@@ -21,12 +22,12 @@ class TextRun:
     """Laid out text.
 
     ``width`` and ``height`` are the text's extent in layout units, which aligning it in the pane uses.
-    ``coverage`` holds the glyphs, (rows, columns, 2) uint8 intensity and alpha, with ``scale_x`` and
-    ``scale_y`` layout units per pixel. Glyphs may reach past the extent, so the coverage starts ``left``
-    layout units right of the extent's left edge (usually a little left of it).
+    ``texels`` holds the glyphs, a (rows, columns, 4) RGBA uint8 image, with ``scale_x`` and ``scale_y``
+    layout units per pixel. Glyphs may reach past the extent, so the image starts ``left`` layout units
+    right of the extent's left edge (usually a little left of it).
     """
 
-    coverage: np.ndarray
+    texels: np.ndarray
     scale_x: float
     scale_y: float
     width: float
@@ -35,11 +36,11 @@ class TextRun:
 
     @property
     def image_width(self) -> float:
-        return self.coverage.shape[1] * self.scale_x
+        return self.texels.shape[1] * self.scale_x
 
     @property
     def image_height(self) -> float:
-        return self.coverage.shape[0] * self.scale_y
+        return self.texels.shape[0] * self.scale_y
 
 
 def line_alignment(text_alignment: int, text_position: int) -> int:
@@ -73,25 +74,24 @@ def layout_text(text: str, font: Brfnt, font_size: tuple[float, float], char_spa
 
     left = min(0.0, min((x for _, x, _ in placed), default=0.0))
     right = max(width, max((x + glyph.widths.glyph_width for glyph, x, _ in placed), default=0.0))
-    coverage = np.zeros((max(1, math.ceil(rows)), max(1, math.ceil(right - left)), 2), dtype=np.uint8)
+    texels = np.zeros((max(1, math.ceil(rows)), max(1, math.ceil(right - left)), 4), dtype=np.uint8)
     for glyph, x, y in placed:
-        _blit_glyph(coverage, font, glyph, round(x - left), round(y))
+        _blit_glyph(texels, font, glyph, round(x - left), round(y))
 
-    return TextRun(coverage, scale_x, scale_y, width * scale_x, height * scale_y, left * scale_x)
+    return TextRun(texels, scale_x, scale_y, width * scale_x, height * scale_y, left * scale_x)
 
 
-def _blit_glyph(coverage: np.ndarray, font: Brfnt, glyph: Glyph, left: int, top: int) -> None:
+def _blit_glyph(texels: np.ndarray, font: Brfnt, glyph: Glyph, left: int, top: int) -> None:
     """Draw a glyph where it covers more than what is already there (glyphs may overlap)."""
     sheet = font.sheet(glyph.sheet)
     image = sheet[glyph.y:glyph.y + glyph.height, glyph.x:glyph.x + min(glyph.widths.glyph_width, glyph.width)]
 
-    height, width = coverage.shape[:2]
+    height, width = texels.shape[:2]
     x0, y0 = max(left, 0), max(top, 0)
     x1, y1 = min(left + image.shape[1], width), min(top + image.shape[0], height)
     if x0 >= x1 or y0 >= y1:
         return
     source = image[y0 - top:y1 - top, x0 - left:x1 - left]
-    target = coverage[y0:y1, x0:x1]
-    covers = source[..., 3] > target[..., 1]
-    target[..., 0][covers] = source[..., 0][covers]
-    target[..., 1][covers] = source[..., 3][covers]
+    target = texels[y0:y1, x0:x1]
+    covers = source[..., 3] > target[..., 3]
+    target[covers] = source[covers]

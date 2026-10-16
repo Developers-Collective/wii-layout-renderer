@@ -104,18 +104,17 @@ def shade_quad(width: int, height: int, vertex_colors: Sequence[ColorTuple],
     return _premultiplied_argb(color[..., :3], alpha)
 
 
-def shade_text(coverage: np.ndarray, top: ColorTuple, bottom: ColorTuple, combiner: Combiner) -> np.ndarray:
-    """Colour a text run's glyph coverage ((height, width, 2): intensity, alpha) into a premultiplied ARGB
-    image. The colour fades from ``top`` to ``bottom``; the material remaps the glyph like a texture."""
-    height = coverage.shape[0]
-    intensity = coverage[..., 0].astype(np.float32)
-    texel = np.stack((intensity, intensity, intensity, coverage[..., 1].astype(np.float32)), axis=-1)
-    glyph = _remap(texel, combiner)
+def shade_text(texels: np.ndarray, top: ColorTuple, bottom: ColorTuple, combiner: Combiner) -> np.ndarray:
+    """Colour a text run's RGBA glyph texels into a premultiplied ARGB image, like a texture: the material
+    remaps them and the text colour, fading from ``top`` to ``bottom``, multiplies them. Pixels no glyph
+    covers stay empty."""
+    height = texels.shape[0]
+    glyph = _remap(texels.astype(np.float32), combiner)
 
     t = ((np.arange(height, dtype=np.float32) + 0.5) / height)[:, None, None]
     top_color, bottom_color = np.asarray(top, np.float32), np.asarray(bottom, np.float32)
     gradient = np.floor(top_color + (bottom_color - top_color) * t)
-    alpha = np.where(coverage[..., 1] > 0, glyph[..., 3] * gradient[..., 3] / 255.0, 0.0)
+    alpha = np.where(texels[..., 3] > 0, glyph[..., 3] * gradient[..., 3] / 255.0, 0.0)
     return _premultiplied_argb(gradient[..., :3] * glyph[..., :3] / 255.0, alpha)
 
 
